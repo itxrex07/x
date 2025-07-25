@@ -1,6 +1,6 @@
 const getUrls = require('get-urls')
 const Collection = require('@discordjs/collection')
-const Util = require('../utils/Util')
+const Util = require('./Util')
 const Message = require('./Message')
 const Attachment = require('./Attachment')
 
