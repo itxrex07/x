@@ -8,7 +8,6 @@ const tough = require('tough-cookie') // Add this dependency
 const Util = require('./utils')
 const { existsSync, readFileSync, unlinkSync, writeFileSync, mkdirSync } = require('fs')
 const fs = require('fs').promises // Use promises version
-const { promisify } = require('util')
 const ClientUser = require('./ClientUser')
 const Message = require('./Message')
 const Chat = require('./Chat')
