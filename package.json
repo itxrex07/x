@@ -1,6 +1,6 @@
 {
   "name": "hyper-insta",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "Hyper Insta - Advanced Instagram Bot with Telegram integration and modular system",
   "main": "index.js",
   "type": "commonjs",
@@ -9,7 +9,9 @@
     "dev": "node --watch index.js",
     "test": "jest",
     "lint": "eslint .",
-    "build": "tsc"
+    "build": "tsc",
+    "example:push": "node examples/push.js",
+    "example:realtime": "node examples/realtime.js"
   },
   "keywords": ["instagram", "bot", "automation", "api", "client", "dm", "messages"],
   "author": "Your Name",
@@ -20,7 +22,8 @@
     "@discordjs/collection": "^2.0.0",
     "get-urls": "^12.1.0",
     "jimp": "^0.22.10",
-    "node-fetch": "^3.3.2"
+    "node-fetch": "^3.3.2",
+    "dotenv": "^16.3.1"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",

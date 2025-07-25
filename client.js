@@ -1,15 +1,19 @@
 const { withRealtime, withFbns,withFbnsAndRealtime } = require('instagram_mqtt')
-// const { GraphQLSubscriptions, SkywalkerSubscriptions } = require('instagram_mqtt/dist/realtime/subscriptions')
+const { GraphQLSubscriptions, SkywalkerSubscriptions } = require('instagram_mqtt/dist/realtime/subscriptions')
 const { IgApiClient } = require('instagram-private-api')
 const { EventEmitter } = require('events')
 const Collection = require('@discordjs/collection')
 
 const Util = require('../utils/Util')
 const {existsSync, readFileSync, unlinkSync, writeFileSync, mkdirSync} = require('fs')
+const { promisify } = require('util')
 const ClientUser = require('./ClientUser')
 const Message = require('./Message')
 const Chat = require('./Chat')
 const User = require('./User')
+
+const writeFileAsync = promisify(writeFileSync)
+const readFileAsync = promisify(readFileSync)
 
 /**
  * Client, the main hub for interacting with the Instagram API.
@@ -19,12 +23,31 @@ class Client extends EventEmitter {
     /**
      * @typedef {object} ClientOptions
      * @property {boolean} disableReplyPrefix Whether the bot should disable user mention for the Message#reply() method
+     * @property {string} [sessionFilePath] Path to save/load session data
+     * @property {string} [cookiesFilePath] Path to save/load cookies
+     * @property {object} [proxy] Proxy configuration
+     * @property {boolean} [autoReconnect=true] Whether to auto-reconnect on disconnect
+     * @property {number} [messageRequestsInterval] Interval to check message requests (ms)
      */
     /**
      * @param {ClientOptions} options
      */
     constructor (options) {
         super()
+        
+        /**
+         * @type {ClientOptions}
+         * The options for the client.
+         */
+        this.options = {
+            disableReplyPrefix: false,
+            sessionFilePath: './session.json',
+            cookiesFilePath: './cookies.json',
+            autoReconnect: true,
+            messageRequestsInterval: 60000,
+            ...options
+        }
+        
         /**
          * @type {?ClientUser}
          * The bot's user object.
@@ -40,11 +63,6 @@ class Client extends EventEmitter {
          * Whether the bot is connected and ready.
          */
         this.ready = false
-        /**
-         * @type {ClientOptions}
-         * The options for the client.
-         */
-        this.options = options || {}
 
         /**
          * @typedef {Object} Cache
@@ -68,6 +86,12 @@ class Client extends EventEmitter {
          * @type {...any[]}
          */
         this.eventsToReplay = []
+        
+        /**
+         * @type {NodeJS.Timeout}
+         * @private
+         */
+        this._messageRequestsInterval = null
     }
 
     /**
@@ -312,28 +336,73 @@ class Client extends EventEmitter {
             return
         }
         this.emit('rawFbns', data)
-        if (data.pushCategory === 'new_follower') {
-            const user = await this.fetchUser(data.sourceUserId)
-            this.emit('newFollower', user)
+        
+        // Enhanced FBNS handling based on examples
+        switch (data.pushCategory) {
+            case 'new_follower':
+                if (data.sourceUserId) {
+                    const user = await this.fetchUser(data.sourceUserId)
+                    this.emit('newFollower', user)
+                }
+                break
+                
+            case 'private_user_follow_request':
+                if (data.sourceUserId) {
+                    const user = await this.fetchUser(data.sourceUserId)
+                    this.emit('followRequest', user)
+                }
+                break
+                
+            case 'direct_v2_pending':
+                if (data.actionParams?.id && !this.cache.pendingChats.get(data.actionParams.id)) {
+                    const pendingRequests = await this.ig.feed.directPending().items()
+                    pendingRequests.forEach((thread) => {
+                        const chat = new Chat(this, thread.thread_id, thread)
+                        this.cache.chats.set(thread.thread_id, chat)
+                        this.cache.pendingChats.set(thread.thread_id, chat)
+                    })
+                    const pendingChat = this.cache.pendingChats.get(data.actionParams.id)
+                    if (pendingChat) {
+                        this.emit('pendingRequest', pendingChat)
+                    }
+                }
+                break
+                
+            case 'live_broadcast':
+                this.emit('liveNotification', data)
+                break
+                
+            default:
+                this.emit('push', data)
+                break
         }
-        if (data.pushCategory === 'private_user_follow_request') {
-            const user = await this.fetchUser(data.sourceUserId)
-            this.emit('followRequest', user)
-        }
-        if (data.pushCategory === 'direct_v2_pending') {
-            if (!this.cache.pendingChats.get(data.actionParams.id)) {
-                const pendingRequests = await this.ig.feed.directPending().items()
-                pendingRequests.forEach((thread) => {
-                    const chat = new Chat(this, thread.thread_id, thread)
-                    this.cache.chats.set(thread.thread_id, chat)
-                    this.cache.pendingChats.set(thread.thread_id, chat)
-                })
-            }
-            const pendingChat = this.cache.pendingChats.get(data.actionParams.id)
-            if (pendingChat) {
-                this.emit('pendingRequest', pendingChat)
-            }
-        }
+    }
+    
+    /**
+     * Send foreground state to Instagram
+     * @param {boolean} inForeground Whether the app is in foreground
+     * @returns {Promise<void>}
+     */
+    async setForegroundState(inForeground = true) {
+        if (!this.ig?.realtime?.direct) return
+        
+        await this.ig.realtime.direct.sendForegroundState({
+            inForegroundApp: inForeground,
+            inForegroundDevice: inForeground,
+            keepAliveTimeout: inForeground ? 60 : 900
+        })
+    }
+    
+    /**
+     * Subscribe to live comments for a broadcast
+     * @param {string} broadcastId The broadcast ID
+     * @returns {Promise<void>}
+     */
+    async subscribeToLiveComments(broadcastId) {
+        
+        await this.ig.realtime.graphQlSubscribe(
+            GraphQLSubscriptions.getLiveRealtimeCommentsSubscription(broadcastId)
+        )
     }
 
     /**
