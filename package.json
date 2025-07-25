@@ -18,11 +18,11 @@
   "license": "MIT",
   "dependencies": {
     "instagram-private-api": "^1.46.1",
-    "instagram_mqtt": "^2.0.0",
+    "instagram_mqtt": "^2.0.1",
     "@discordjs/collection": "^2.0.0",
     "get-urls": "^12.1.0",
     "jimp": "^0.22.10",
-    "node-fetch": "^3.3.2",
+    "node-fetch": "^2.7.0",
     "dotenv": "^16.3.1"
   },
   "devDependencies": {

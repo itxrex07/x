@@ -1,18 +1,12 @@
 // index.js
-const { Client } = require('./client'); // Adjust path as needed
+const Client = require('./client');
 
 async function main() {
   const client = new Client({
     // Configure options
     sessionFilePath: './my_session.json',
     cookiesFilePath: './my_cookies.json',
-    proxy: { // Example proxy config
-      type: 5,
-      host: 'proxy.example.com',
-      port: 1080,
-      // username: 'user',
-      // password: 'pass'
-    }
+    autoReconnect: true
   });
 
   // --- Event Listeners ---
@@ -81,7 +75,11 @@ async function main() {
 
   // --- Login and Start ---
   try {
-    await client.login();
+    // Load credentials from environment or hardcode for testing
+    const username = process.env.IG_USERNAME || 'your_username';
+    const password = process.env.IG_PASSWORD || 'your_password';
+    
+    await client.login(username, password);
     console.log('🚀 Combined Instagram Bot is running!');
   } catch (error) {
     console.error('❌ Failed to start bot:', error.message);

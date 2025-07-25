@@ -4,7 +4,7 @@ const { IgApiClient } = require('instagram-private-api')
 const { EventEmitter } = require('events')
 const Collection = require('@discordjs/collection')
 
-const Util = require('../utils/Util')
+const Util = require('./utils')
 const {existsSync, readFileSync, unlinkSync, writeFileSync, mkdirSync} = require('fs')
 const { promisify } = require('util')
 const ClientUser = require('./ClientUser')
